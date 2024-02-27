@@ -1,0 +1,57 @@
+public class Create_Task_Schedule_Apex implements Schedulable {
+
+    
+    public void execute(SchedulableContext Str){
+      
+    	// Calculate the date three days ago
+        DateTime threeDaysAgo = DateTime.now().addDays(-3);
+        List<Lead> Getleads = [SELECT Id, Name, Email, OwnerId, Website FROM Lead
+                               WHERE CreatedDate < :threeDaysAgo AND
+                               Status = 'Open - Not Contacted'];
+        System.debug('Leads i got are ;'+ Getleads);
+            
+        //a list of emails that will store after the loop.
+        List<Messaging.Email> emailList = new List<Messaging.Email>();
+        
+        //lets create another list for the task creation.
+        List<Task> TaskList = new List<Task>();
+        
+        
+        for(lead ld : Getleads){
+            Messaging.SingleEmailMessage msg = new Messaging.SingleEmailMessage();
+            String[] address = new String[]{ld.Owner.Email};
+            msg.SetToAddresses(address);
+            String subj = 'A new Lead has been create';
+            msg.SetSubject(subj);
+            String EmailContent = 'Hi, ' + ld.Owner.Name + '<br/><br/>'+
+                					' A new lead has been created named ' + ld.Name + '.'+
+                					' <br/> <br/> Please Start working on the lead.<br/>' + 
+                					'Thanku.';
+			msg.setHtmlBody(EmailContent);
+            emailList.add(msg);
+                        
+            ld.Email_Sent__c = true;
+            
+            //lets create  task as well for th leads.
+            Task tsk = new Task();
+            tsk.Subject = 'Start working on lead';
+            tsk.OwnerId = ld.OwnerId;
+            tsk.Priority = 'High';
+            tsk.Status = 'In Progress';
+            tsk.Description = URL.getOrgDomainURL().toExternalForm() +'/' + ld.Id;
+            tsk.WhoId = ld.Id;    
+            TaskList.add(tsk);
+            
+        }
+        
+        //here is the list to send the email.
+        Messaging.SendEmail(emailList);
+        System.debug('Sent email are' + emailList);
+        //lets add it to the database using DML  Operation.
+        insert TaskList;
+        System.debug('task inserted is  : ' + TaskList);
+        
+
+    }
+}
+
